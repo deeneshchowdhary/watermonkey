@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Water Monkey cloud cost shield">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="52" x2="440" y2="460" gradientUnits="userSpaceOnUse"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#7C3AED"/></linearGradient>
+    <linearGradient id="line" x1="164" y1="205" x2="350" y2="329" gradientUnits="userSpaceOnUse"><stop stop-color="#A5F3FC"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+  </defs>
+  <rect x="36" y="36" width="440" height="440" rx="132" fill="url(#bg)"/>
+  <path d="M256 94c48 34 96 44 134 48v103c0 82-46 139-134 176-88-37-134-94-134-176V142c38-4 86-14 134-48Z" fill="#11162A" fill-opacity=".24" stroke="#fff" stroke-opacity=".22" stroke-width="10"/>
+  <path d="M182 272h143c31 0 55-22 55-51 0-27-22-49-50-51-12-36-46-62-87-62-47 0-86 35-91 79-28 7-48 29-48 57 0 16 7 30 18 40" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m166 226 67 62 58-51 63 57" fill="none" stroke="url(#line)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M354 257v37h-39" fill="none" stroke="#fff" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="166" cy="226" r="13" fill="#C4B5FD"/>
+</svg>

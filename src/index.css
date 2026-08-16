@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-[#f7f8fc] text-slate-900 antialiased transition-colors duration-300;
+  }
+  html.dark body {
+    @apply bg-[#080b14] text-slate-100;
+  }
+}
+
+@layer utilities {
+  .app-grid {
+    background-image: linear-gradient(to right, rgb(99 102 241 / 0.035) 1px, transparent 1px), linear-gradient(to bottom, rgb(99 102 241 / 0.035) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .dark .app-grid {
+    background-image: linear-gradient(to right, rgb(129 140 248 / 0.035) 1px, transparent 1px), linear-gradient(to bottom, rgb(129 140 248 / 0.035) 1px, transparent 1px);
+  }
+}
