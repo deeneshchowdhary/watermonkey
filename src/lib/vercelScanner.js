@@ -22,7 +22,8 @@ export async function scanVercelWaste(token) {
           provider: 'Vercel',
           resource: 'Inactive Project',
           details: `${project.name} (${daysInactive}d inactive)`,
-          monthlyLoss: 20.00
+          monthlyLoss: 20.00,
+          remediable: true,
         });
       }
     }

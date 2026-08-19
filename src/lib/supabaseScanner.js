@@ -16,7 +16,8 @@ export async function scanSupabaseWaste(token) {
           provider: 'Supabase',
           resource: 'Paused/Idle Instance',
           details: `${project.name} (${project.region})`,
-          monthlyLoss: 25.00
+          monthlyLoss: 25.00,
+          remediable: false,
         });
       }
     }

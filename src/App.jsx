@@ -123,7 +123,7 @@ export default function App() {
   };
 
   const handleKillResource = async (item) => {
-    const result = item.remediable === false
+    const result = item.remediable !== true
       ? { success: true, message: 'Finding acknowledged.' }
       : await deleteResource(item, { awsKeyId, awsSecretKey, vercelToken, supabaseToken, gcpToken, azureToken });
     if (!result.success) {
@@ -136,7 +136,7 @@ export default function App() {
       category: 'remediation',
       status: 'success',
       provider: item.provider,
-      title: item.remediable === false ? 'Finding acknowledged' : 'Resource resolved',
+      title: item.remediable !== true ? 'Finding acknowledged' : 'Resource resolved',
       message: `${item.resource} (${item.id}) — ${result.message}`,
     });
   };

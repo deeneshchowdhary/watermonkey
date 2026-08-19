@@ -2,6 +2,8 @@
 
 Water Monkey is a local-first desktop application for finding avoidable cloud costs. It combines a React dashboard with a Rust/Tauri backend, native keychain storage, and optional local AI summaries through Ollama.
 
+See [SPEC.md](SPEC.md) for the complete current-feature specification, development backlog, acceptance criteria, and release requirements.
+
 ## Current capabilities
 
 - Scan AWS for unattached EBS volumes and unused Elastic IPs.

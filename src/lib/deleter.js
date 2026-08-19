@@ -4,6 +4,10 @@ import { EC2Client, DeleteVolumeCommand, ReleaseAddressCommand } from '@aws-sdk/
 export async function deleteResource(item, credentials) {
   const { provider, id } = item;
 
+  if (item.remediable !== true) {
+    return { success: false, message: 'This finding is review-only; no provider changes were made.' };
+  }
+
   if (provider === 'Vercel') {
     const token = credentials.vercelToken;
     if (!token) {

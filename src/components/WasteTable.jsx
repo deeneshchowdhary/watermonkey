@@ -58,7 +58,7 @@ export default function WasteTable({ wasteItems, onKillResource }) {
                   className="px-3 py-1.5 bg-slate-100 dark:bg-white/[0.06] hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded-lg text-xs font-medium flex items-center gap-1.5 ml-auto transition"
                 >
                   <Trash2 size={14} />
-                  <span>{item.remediable === false ? 'Review' : 'Resolve'}</span>
+                  <span>{item.remediable === true ? 'Resolve' : 'Review'}</span>
                 </button>
               </td>
             </tr>
@@ -83,7 +83,7 @@ export default function WasteTable({ wasteItems, onKillResource }) {
             </div>
 
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
-              {selectedItem.remediable === false
+              {selectedItem.remediable !== true
                 ? 'This finding cannot be safely remediated automatically. Confirm to acknowledge and remove it from the current report.'
                 : 'Are you sure you want to permanently delete this resource? This action will execute directly against your live cloud provider API.'}
             </p>
@@ -109,7 +109,7 @@ export default function WasteTable({ wasteItems, onKillResource }) {
                 disabled={isDeleting}
                 className="px-4 py-2 bg-monkeyDanger hover:bg-red-600 text-white font-bold rounded-lg text-sm flex items-center gap-2 transition"
               >
-                {isDeleting ? "Working..." : selectedItem.remediable === false ? "Acknowledge" : "Confirm Termination"}
+                {isDeleting ? "Working..." : selectedItem.remediable === true ? "Confirm Termination" : "Acknowledge"}
               </button>
             </div>
           </div>

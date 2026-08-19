@@ -25,6 +25,7 @@ export async function scanAwsWaste(region = "us-east-1", accessKeyId, secretAcce
         monthlyLoss: parseFloat(monthlyCost),
         severity: "High",
         region,
+        remediable: true,
       });
     });
 
@@ -41,6 +42,7 @@ export async function scanAwsWaste(region = "us-east-1", accessKeyId, secretAcce
           monthlyLoss: 3.60,
           severity: "Medium",
           region,
+          remediable: true,
         });
       }
     });
