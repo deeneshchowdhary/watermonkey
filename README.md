@@ -6,15 +6,17 @@ See [SPEC.md](SPEC.md) for the complete current-feature specification, developme
 
 ## Current capabilities
 
-- Scan AWS for unattached EBS volumes and unused Elastic IPs.
-- Inspect inactive Vercel and Supabase projects.
-- Detect OpenAI organization cost spikes.
-- Store provider credentials in the native operating-system keychain.
-- Generate local FinOps summaries using Ollama.
+- Scan AWS (selectable regions), GCP (selectable zones), and Azure for unattached disks and unused/reserved IPs.
+- Inspect inactive Vercel and Supabase projects, and OpenAI organization cost spikes.
+- Configurable scan scope and pricing assumptions per provider, with an explanation attached to every finding's estimate.
+- Read-only connection testing and guarded credential removal per provider, on top of native OS keychain storage.
+- Persist findings across scans with a full lifecycle (open/acknowledged/resolved/missing/reopened) instead of losing history on every scan.
+- Per-provider scan status with independent retry on failure.
+- Search, sort, and filter findings by status; severity is computed from a single documented rule, not per-provider guesses.
+- Generate local FinOps summaries using Ollama, with configurable endpoint/model and an opt-out.
 - Review locally persisted scan and remediation activity.
-- Delete supported AWS and Vercel resources after confirmation.
-
-GCP and Azure connections are present in the interface, but their live scanners are not implemented yet.
+- Delete supported AWS and Vercel resources after confirmation; Supabase deep-links to its dashboard for manual action; GCP and Azure findings are review-only.
+- System/light/dark theme; usable down to narrower desktop window widths.
 
 ## Requirements
 
@@ -34,6 +36,13 @@ Build the frontend independently with:
 
 ```bash
 npm run build
+```
+
+Run the test suites:
+
+```bash
+npm test
+cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
 
 Check the Rust backend with:

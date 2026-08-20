@@ -6,6 +6,7 @@ import WasteDistribution from './components/WasteDistribution';
 import KeychainSettings from './components/KeychainSettings';
 import AiInsights from './components/AiInsights';
 import ActivityLog from './components/ActivityLog';
+import ProviderStatusStrip from './components/ProviderStatusStrip';
 import { scanAwsWaste } from './lib/awsScanner';
 import { scanVercelWaste } from './lib/vercelScanner';
 import { scanSupabaseWaste } from './lib/supabaseScanner';
@@ -14,23 +15,42 @@ import { scanAzureWaste } from './lib/azureScanner';
 import { scanOpenAiWaste } from './lib/openaiScanner';
 import { deleteResource } from './lib/deleter';
 import { retrieveLocalKeys } from './lib/keychain';
+import { loadScanSettings, saveScanSettings } from './lib/scanSettings';
+import { loadReport, saveReport, reconcile, activeRecords, markAcknowledged, markResolved } from './lib/findingsStore';
+import { computeSeverity } from './lib/severity';
+import { useTheme } from './lib/theme';
 import { RefreshCw, TrendingDown, ShieldCheck, Cloud } from 'lucide-react';
+
+const PROVIDER_IDS = ['AWS', 'Vercel', 'Supabase', 'GCP', 'Azure', 'OpenAI'];
+const idleProviderStatus = () => Object.fromEntries(PROVIDER_IDS.map((p) => [p, { state: 'idle', message: '' }]));
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isScanning, setIsScanning] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('ALL');
+  const [theme, setTheme] = useTheme();
 
   // Credentials State
   const [awsKeyId, setAwsKeyId] = useState('');
   const [awsSecretKey, setAwsSecretKey] = useState('');
   const [vercelToken, setVercelToken] = useState('');
   const [supabaseToken, setSupabaseToken] = useState('');
-  const [gcpToken, setGcpToken] = useState('');
+  const [gcpProjectId, setGcpProjectId] = useState('');
+  const [gcpCredential, setGcpCredential] = useState('');
   const [azureSubscriptionId, setAzureSubscriptionId] = useState('');
-  const [azureToken, setAzureToken] = useState('');
+  const [azureTenantId, setAzureTenantId] = useState('');
+  const [azureClientId, setAzureClientId] = useState('');
+  const [azureClientSecret, setAzureClientSecret] = useState('');
   const [openAiKey, setOpenAiKey] = useState('');
+  // Snapshots of credential values as of the last successful keychain save
+  // and the last successful ("valid") connection test, keyed by provider.
+  // A provider only counts as connected when both snapshots still match the
+  // values currently shown in the form — see isConnected in KeychainSettings.
+  const [savedCredentials, setSavedCredentials] = useState({});
+  const [verifiedCredentials, setVerifiedCredentials] = useState({});
+  const [scanSettings, setScanSettings] = useState(loadScanSettings);
   const [scanMessage, setScanMessage] = useState('');
+  const [providerStatus, setProviderStatus] = useState(idleProviderStatus);
+  const [report, setReport] = useState(loadReport);
   const [activityEvents, setActivityEvents] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('watermonkey-activity') || '[]');
@@ -39,9 +59,19 @@ export default function App() {
     }
   });
 
+  const isScanning = Object.values(providerStatus).some((p) => p.state === 'scanning');
+
   useEffect(() => {
     localStorage.setItem('watermonkey-activity', JSON.stringify(activityEvents.slice(0, 250)));
   }, [activityEvents]);
+
+  useEffect(() => {
+    saveScanSettings(scanSettings);
+  }, [scanSettings]);
+
+  const updateScanSettings = (provider, partial) => {
+    setScanSettings((current) => ({ ...current, [provider]: { ...current[provider], ...partial } }));
+  };
 
   const addActivity = (event) => {
     setActivityEvents((current) => [{
@@ -57,12 +87,31 @@ export default function App() {
         ['aws', 'vercel', 'supabase', 'gcp', 'azure', 'openai'].map(retrieveLocalKeys),
       );
       const [aws, vercel, supabase, gcp, azure, openai] = providers;
-      if (aws) { setAwsKeyId(aws.keyId); setAwsSecretKey(aws.secretKey); }
-      if (vercel) setVercelToken(vercel.keyId);
-      if (supabase) setSupabaseToken(supabase.keyId);
-      if (gcp) setGcpToken(gcp.keyId);
-      if (azure) { setAzureSubscriptionId(azure.keyId); setAzureToken(azure.secretKey); }
-      if (openai) setOpenAiKey(openai.keyId);
+      const restored = {};
+      if (aws) { setAwsKeyId(aws.keyId); setAwsSecretKey(aws.secretKey); restored.aws = { keyId: aws.keyId, secretKey: aws.secretKey || '' }; }
+      if (vercel) { setVercelToken(vercel.keyId); restored.vercel = { keyId: vercel.keyId, secretKey: '' }; }
+      if (supabase) { setSupabaseToken(supabase.keyId); restored.supabase = { keyId: supabase.keyId, secretKey: '' }; }
+      if (gcp) { setGcpProjectId(gcp.keyId); setGcpCredential(gcp.secretKey || ''); restored.gcp = { keyId: gcp.keyId, secretKey: gcp.secretKey || '' }; }
+      if (azure) {
+        setAzureSubscriptionId(azure.keyId);
+        // Older saved Azure secrets (a raw bearer token) predate this JSON
+        // packing and won't parse — that's fine, Azure never had a working
+        // scanner before, so this is a one-time re-entry, not data loss.
+        try {
+          const parsed = JSON.parse(azure.secretKey || '{}');
+          setAzureTenantId(parsed.tenantId || '');
+          setAzureClientId(parsed.clientId || '');
+          setAzureClientSecret(parsed.clientSecret || '');
+          restored.azure = { keyId: azure.keyId, secretKey: azure.secretKey || '' };
+        } catch {
+          restored.azure = { keyId: azure.keyId, secretKey: '' };
+        }
+      }
+      if (openai) { setOpenAiKey(openai.keyId); restored.openai = { keyId: openai.keyId, secretKey: '' }; }
+      // Credentials restored from the keychain are known-saved but not
+      // known-valid this session, so only the saved snapshot is seeded here;
+      // the connected badge stays off until the user re-runs a test.
+      setSavedCredentials(restored);
     };
     restoreCredentials();
   }, []);
@@ -74,77 +123,144 @@ export default function App() {
       aws: () => { setAwsKeyId(''); setAwsSecretKey(''); },
       vercel: () => setVercelToken(''),
       supabase: () => setSupabaseToken(''),
-      gcp: () => setGcpToken(''),
-      azure: () => { setAzureSubscriptionId(''); setAzureToken(''); },
+      gcp: () => { setGcpProjectId(''); setGcpCredential(''); },
+      azure: () => { setAzureSubscriptionId(''); setAzureTenantId(''); setAzureClientId(''); setAzureClientSecret(''); },
       openai: () => setOpenAiKey(''),
     };
     clearers[provider]?.();
+    setSavedCredentials((current) => ({ ...current, [provider]: undefined }));
+    setVerifiedCredentials((current) => ({ ...current, [provider]: undefined }));
   };
 
-  const [wasteItems, setWasteItems] = useState([]);
+  const handleCredentialsSaved = (provider, keyId, secretKey) => {
+    setSavedCredentials((current) => ({ ...current, [provider]: { keyId, secretKey: secretKey || '' } }));
+  };
 
-  const totalMonthlyLoss = wasteItems.reduce((acc, i) => acc + i.monthlyLoss, 0);
+  const handleCredentialsVerified = (provider, keyId, secretKey, isValid) => {
+    setVerifiedCredentials((current) => ({
+      ...current,
+      [provider]: isValid ? { keyId, secretKey: secretKey || '' } : undefined,
+    }));
+  };
 
-  const filteredItems = selectedProvider === 'ALL'
-    ? wasteItems
-    : wasteItems.filter(item => item.provider === selectedProvider);
+  const activeItems = activeRecords(report.records).map((r) => ({ ...r, severity: computeSeverity(r.monthlyLoss) }));
+  const totalMonthlyLoss = activeItems.reduce((acc, i) => acc + i.monthlyLoss, 0);
 
-  const handleRunScan = async () => {
-    setIsScanning(true);
-    addActivity({ category: 'scan', status: 'info', title: 'Fleet scan started', message: 'Checking all configured providers for potential cloud waste.' });
+  const filteredRecords = (selectedProvider === 'ALL'
+    ? report.records
+    : report.records.filter((item) => item.provider === selectedProvider)
+  ).map((r) => ({ ...r, severity: computeSeverity(r.monthlyLoss) }));
+
+  // Each entry either resolves to { status: 'succeeded', findings } or
+  // { status: 'skipped', findings: [] } — scan/network errors are caught
+  // here so one provider's failure never stops the others (§2.4).
+  const providerScanners = {
+    AWS: async () => {
+      if (!(awsKeyId && awsSecretKey && scanSettings.aws.regions.length > 0)) return { status: 'skipped', findings: [] };
+      const findings = await scanAwsWaste(scanSettings.aws.regions, awsKeyId, awsSecretKey, scanSettings.aws);
+      return { status: 'succeeded', findings, warning: formatRegionErrors(findings.regionErrors) };
+    },
+    Vercel: async () => {
+      if (!vercelToken) return { status: 'skipped', findings: [] };
+      return { status: 'succeeded', findings: await scanVercelWaste(vercelToken, scanSettings.vercel) };
+    },
+    Supabase: async () => {
+      if (!supabaseToken) return { status: 'skipped', findings: [] };
+      return { status: 'succeeded', findings: await scanSupabaseWaste(supabaseToken, scanSettings.supabase) };
+    },
+    GCP: async () => {
+      if (!(gcpProjectId && gcpCredential && scanSettings.gcp.zones.length > 0)) return { status: 'skipped', findings: [] };
+      const findings = await scanGcpWaste(gcpProjectId, gcpCredential, scanSettings.gcp.zones);
+      return { status: 'succeeded', findings, warning: formatRegionErrors(findings.regionErrors) };
+    },
+    Azure: async () => {
+      if (!(azureSubscriptionId && azureTenantId && azureClientId && azureClientSecret)) return { status: 'skipped', findings: [] };
+      const findings = await scanAzureWaste(azureSubscriptionId, { tenantId: azureTenantId, clientId: azureClientId, clientSecret: azureClientSecret });
+      return { status: 'succeeded', findings, warning: formatRegionErrors(findings.regionErrors) };
+    },
+    OpenAI: async () => {
+      if (!openAiKey) return { status: 'skipped', findings: [] };
+      return { status: 'succeeded', findings: await scanOpenAiWaste(openAiKey, scanSettings.openai) };
+    },
+  };
+
+  function formatRegionErrors(regionErrors) {
+    if (!regionErrors || !regionErrors.length) return null;
+    return `Skipped ${regionErrors.map((e) => e.region).join(', ')} (${regionErrors[0].message})`;
+  }
+
+  const runProviderScan = async (providerId) => {
+    setProviderStatus((current) => ({ ...current, [providerId]: { state: 'scanning', message: '' } }));
     try {
-      setScanMessage('');
-      const scans = [
-        ['AWS', awsKeyId && awsSecretKey ? scanAwsWaste("us-east-1", awsKeyId, awsSecretKey) : Promise.resolve([])],
-        ['Vercel', scanVercelWaste(vercelToken)],
-        ['Supabase', scanSupabaseWaste(supabaseToken)],
-        ['GCP', scanGcpWaste(gcpToken)],
-        ['Azure', scanAzureWaste(azureToken)],
-        ['OpenAI', scanOpenAiWaste(openAiKey)],
-      ];
-      const results = await Promise.allSettled(scans.map(([, scan]) => scan));
-      const combinedWaste = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []).filter(item => item.monthlyLoss > 0);
-      const failed = results.flatMap((result, index) => result.status === 'rejected' ? [scans[index][0]] : []);
-      const failureDetails = results.flatMap((result, index) => result.status === 'rejected'
-        ? [`${scans[index][0]}: ${result.reason?.message || String(result.reason)}`]
-        : []);
-      const skipped = [
-        !awsKeyId || !awsSecretKey ? 'AWS' : null,
-        !vercelToken ? 'Vercel' : null,
-        !supabaseToken ? 'Supabase' : null,
-        !gcpToken ? 'GCP' : null,
-        !azureToken ? 'Azure' : null,
-        !openAiKey ? 'OpenAI' : null,
-      ].filter(Boolean);
-      setWasteItems(combinedWaste);
-      setScanMessage(failed.length
-        ? `Scan completed with warnings. ${failureDetails.join(' ')}`
-        : skipped.length
-          ? `Scan completed. Skipped unconfigured providers: ${skipped.join(', ')}.`
-          : 'Fleet audit completed.');
-      addActivity({
-        category: 'scan',
-        status: failed.length ? 'warning' : 'success',
-        title: failed.length ? 'Scan completed with warnings' : 'Fleet scan completed',
-        message: `${combinedWaste.length} finding${combinedWaste.length === 1 ? '' : 's'} detected with $${combinedWaste.reduce((sum, item) => sum + item.monthlyLoss, 0).toFixed(2)}/month in potential savings.${failureDetails.length ? ` ${failureDetails.join(' ')}` : ''}${skipped.length ? ` Skipped: ${skipped.join(', ')}.` : ''}`,
-      });
+      const result = await providerScanners[providerId]();
+      setProviderStatus((current) => ({ ...current, [providerId]: { state: result.status, message: result.warning || '' } }));
+      return { provider: providerId, ...result };
     } catch (err) {
-      console.error("Scan error:", err);
-      addActivity({ category: 'scan', status: 'error', title: 'Fleet scan failed', message: err.message || String(err) });
-    } finally {
-      setIsScanning(false);
+      const message = err?.message || String(err);
+      setProviderStatus((current) => ({ ...current, [providerId]: { state: 'failed', message } }));
+      return { provider: providerId, status: 'failed', findings: [], error: message };
     }
   };
 
+  const runScan = async (providerIds) => {
+    const isFullScan = providerIds.length === PROVIDER_IDS.length;
+    addActivity({
+      category: 'scan',
+      status: 'info',
+      title: isFullScan ? 'Fleet scan started' : `${providerIds[0]} scan started`,
+      message: isFullScan ? 'Checking all configured providers for potential cloud waste.' : `Re-checking ${providerIds[0]} after a previous failure.`,
+    });
+    setScanMessage('');
+
+    const results = await Promise.all(providerIds.map(runProviderScan));
+    const resultsByProvider = Object.fromEntries(results.map((r) => [r.provider, r]));
+    const now = new Date().toISOString();
+    const nextRecords = reconcile(report.records, resultsByProvider, now);
+    const nextReport = saveReport({ records: nextRecords, lastScanAt: now });
+    setReport(nextReport);
+
+    const succeeded = results.filter((r) => r.status === 'succeeded');
+    const failed = results.filter((r) => r.status === 'failed');
+    const skipped = results.filter((r) => r.status === 'skipped');
+    const warnings = succeeded.filter((r) => r.warning);
+    const newFindingCount = succeeded.reduce((sum, r) => sum + (r.findings?.length || 0), 0);
+    const newFindingLoss = succeeded.reduce((sum, r) => sum + (r.findings || []).reduce((s, f) => s + f.monthlyLoss, 0), 0);
+
+    const hasWarnings = failed.length > 0 || warnings.length > 0;
+    const parts = [];
+    failed.forEach((r) => parts.push(`${r.provider}: ${r.error}`));
+    warnings.forEach((r) => parts.push(`${r.provider}: ${r.warning}`));
+
+    setScanMessage(hasWarnings
+      ? `Scan completed with warnings. ${parts.join(' ')}`
+      : skipped.length
+        ? `Scan completed. Skipped unconfigured providers: ${skipped.map((r) => r.provider).join(', ')}.`
+        : isFullScan ? 'Fleet audit completed.' : `${providerIds[0]} scan completed.`);
+
+    addActivity({
+      category: 'scan',
+      status: hasWarnings ? 'warning' : 'success',
+      title: hasWarnings ? 'Scan completed with warnings' : (isFullScan ? 'Fleet scan completed' : `${providerIds[0]} scan completed`),
+      message: `${newFindingCount} finding${newFindingCount === 1 ? '' : 's'} reported with $${newFindingLoss.toFixed(2)}/month in potential savings.${parts.length ? ` ${parts.join(' ')}` : ''}${skipped.length ? ` Skipped: ${skipped.map((r) => r.provider).join(', ')}.` : ''}`,
+    });
+  };
+
+  const handleRunScan = () => runScan(PROVIDER_IDS);
+  const handleRetryProvider = (providerId) => runScan([providerId]);
+
   const handleKillResource = async (item) => {
+    const now = new Date().toISOString();
     const result = item.remediable !== true
       ? { success: true, message: 'Finding acknowledged.' }
-      : await deleteResource(item, { awsKeyId, awsSecretKey, vercelToken, supabaseToken, gcpToken, azureToken });
+      : await deleteResource(item, { awsKeyId, awsSecretKey, vercelToken, supabaseToken });
     if (!result.success) {
       addActivity({ category: 'remediation', status: 'error', provider: item.provider, title: 'Remediation failed', message: `${item.resource}: ${result.message}` });
       throw new Error(result.message);
     }
-    setWasteItems((current) => current.filter((entry) => entry.id !== item.id));
+    const nextRecords = item.remediable !== true
+      ? markAcknowledged(report.records, item.provider, item.id, now)
+      : markResolved(report.records, item.provider, item.id, now);
+    setReport(saveReport({ ...report, records: nextRecords }));
     setScanMessage(result.message);
     addActivity({
       category: 'remediation',
@@ -163,11 +279,11 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden font-sans bg-[#f7f8fc] dark:bg-[#080b14] text-slate-900 dark:text-slate-100 transition-colors duration-300">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} setTheme={setTheme} />
 
       <main className="app-grid flex-1 overflow-y-auto">
-        <div className="max-w-[1320px] mx-auto px-8 py-7">
-        <header className="flex justify-between items-center mb-8">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 py-7">
+        <header className="flex flex-wrap justify-between items-center gap-4 mb-8">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
               {pageCopy[activeTab][0]}
@@ -195,12 +311,21 @@ export default function App() {
             awsSecretKey={awsSecretKey} setAwsSecretKey={setAwsSecretKey}
             vercelToken={vercelToken} setVercelToken={setVercelToken}
             supabaseToken={supabaseToken} setSupabaseToken={setSupabaseToken}
-            gcpToken={gcpToken} setGcpToken={setGcpToken}
+            gcpProjectId={gcpProjectId} setGcpProjectId={setGcpProjectId}
+            gcpCredential={gcpCredential} setGcpCredential={setGcpCredential}
             azureSubscriptionId={azureSubscriptionId} setAzureSubscriptionId={setAzureSubscriptionId}
-            azureToken={azureToken} setAzureToken={setAzureToken}
+            azureTenantId={azureTenantId} setAzureTenantId={setAzureTenantId}
+            azureClientId={azureClientId} setAzureClientId={setAzureClientId}
+            azureClientSecret={azureClientSecret} setAzureClientSecret={setAzureClientSecret}
             openAiKey={openAiKey} setOpenAiKey={setOpenAiKey}
+            savedCredentials={savedCredentials}
+            verifiedCredentials={verifiedCredentials}
+            onCredentialsSaved={handleCredentialsSaved}
+            onCredentialsVerified={handleCredentialsVerified}
             onClearProvider={clearProviderCredentials}
             onLogActivity={addActivity}
+            scanSettings={scanSettings}
+            onUpdateScanSettings={updateScanSettings}
           />
         ) : activeTab === 'activity' ? (
           <ActivityLog events={activityEvents} onClear={() => setActivityEvents([])} />
@@ -219,30 +344,32 @@ export default function App() {
 
               <div className="bg-white dark:bg-white/[0.035] p-5 rounded-2xl border border-slate-200 dark:border-white/[0.07]">
                 <ShieldCheck size={18} className="text-emerald-500 mb-5" />
-                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{wasteItems.length}</div>
+                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{activeItems.length}</div>
                 <span className="text-slate-500 dark:text-slate-400 text-xs">Findings to review</span>
                 </div>
 
               <div className="bg-white dark:bg-white/[0.035] p-5 rounded-2xl border border-slate-200 dark:border-white/[0.07]">
                 <Cloud size={18} className="text-indigo-500 mb-5" />
-                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{new Set(wasteItems.map((item) => item.provider)).size}</div>
+                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{new Set(activeItems.map((item) => item.provider)).size}</div>
                 <span className="text-slate-500 dark:text-slate-400 text-xs">Providers with findings</span>
               </div>
             </div>
 
-            <WasteDistribution wasteItems={wasteItems} />
+            <ProviderStatusStrip providerStatus={providerStatus} onRetry={handleRetryProvider} isScanning={isScanning} />
+
+            <WasteDistribution wasteItems={activeItems} />
 
             {scanMessage && <div className="mb-6 px-4 py-3 rounded-xl border border-indigo-200 dark:border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-sm">{scanMessage}</div>}
 
-            <AiInsights wasteItems={wasteItems} />
+            <AiInsights wasteItems={activeItems} />
 
             <ProviderTabs
               selectedProvider={selectedProvider}
               setSelectedProvider={setSelectedProvider}
-              wasteItems={wasteItems}
+              wasteItems={activeItems}
             />
 
-            <WasteTable wasteItems={filteredItems} onKillResource={handleKillResource} />
+            <WasteTable wasteItems={filteredRecords} onKillResource={handleKillResource} />
           </>
         )}
         </div>

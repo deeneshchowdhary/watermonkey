@@ -1,7 +1,14 @@
-export async function scanVercelWaste(token) {
+export const DEFAULT_VERCEL_SETTINGS = {
+  inactivityDays: 60,
+  monthlyEstimate: 20.00,
+};
+
+export async function scanVercelWaste(token, options = {}) {
   if (!token) {
     return [];
   }
+
+  const { inactivityDays, monthlyEstimate } = { ...DEFAULT_VERCEL_SETTINGS, ...options };
 
   try {
     const res = await fetch('https://api.vercel.com/v9/projects', {
@@ -16,14 +23,15 @@ export async function scanVercelWaste(token) {
       const updatedAt = new Date(project.updatedAt);
       const daysInactive = Math.floor((Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      if (daysInactive > 60) {
+      if (daysInactive > inactivityDays) {
         waste.push({
           id: `ver-${project.id}`,
           provider: 'Vercel',
           resource: 'Inactive Project',
-          details: `${project.name} (${daysInactive}d inactive)`,
-          monthlyLoss: 20.00,
+          details: `${project.name} (${daysInactive}d inactive, threshold ${inactivityDays}d)`,
+          monthlyLoss: monthlyEstimate,
           remediable: true,
+          estimateBasis: `Estimate: flat $${monthlyEstimate.toFixed(2)}/month for a project with no deployments in the last ${inactivityDays} days (configurable threshold and rate).`,
         });
       }
     }

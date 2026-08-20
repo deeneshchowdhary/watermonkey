@@ -1,9 +1,15 @@
 import { invoke } from '@tauri-apps/api/tauri';
 
-export async function scanSupabaseWaste(token) {
+export const DEFAULT_SUPABASE_SETTINGS = {
+  monthlyEstimate: 25.00,
+};
+
+export async function scanSupabaseWaste(token, options = {}) {
   if (!token) {
     return [];
   }
+
+  const { monthlyEstimate } = { ...DEFAULT_SUPABASE_SETTINGS, ...options };
 
   try {
     const projects = await invoke('list_supabase_projects', { token });
@@ -16,8 +22,9 @@ export async function scanSupabaseWaste(token) {
           provider: 'Supabase',
           resource: 'Paused/Idle Instance',
           details: `${project.name} (${project.region})`,
-          monthlyLoss: 25.00,
+          monthlyLoss: monthlyEstimate,
           remediable: false,
+          estimateBasis: `Estimate: flat $${monthlyEstimate.toFixed(2)}/month for a project reported as ${project.status} (configurable rate).`,
         });
       }
     }

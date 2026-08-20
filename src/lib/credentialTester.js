@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { EC2Client, DescribeVolumesCommand } from '@aws-sdk/client-ec2';
+import { resolveAccessToken as resolveGcpAccessToken } from './gcpScanner';
+import { getAccessToken as getAzureAccessToken } from './azureScanner';
 
 const PROBE_TIMEOUT_MS = 15000;
 
@@ -205,99 +207,94 @@ async function testOpenAi({ keyId: adminKey }) {
 }
 
 // --- GCP ------------------------------------------------------------------
+// keyId = project ID, secretKey = service account JSON or a raw OAuth token
+// (matches the field layout used by gcpScanner.js).
 
-const GCP_READ_SCOPES = [
-  'https://www.googleapis.com/auth/cloud-platform',
-  'https://www.googleapis.com/auth/cloud-platform.read-only',
-  'https://www.googleapis.com/auth/compute',
-  'https://www.googleapis.com/auth/compute.readonly',
-];
-
-async function testGcp({ keyId: credential }) {
-  const trimmed = credential.trim();
-
-  if (trimmed.startsWith('{')) {
-    let parsed;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      return result('format_error', 'The service account credential is not valid JSON.');
-    }
-    const missing = ['type', 'project_id', 'client_email', 'private_key'].filter((field) => !parsed[field]);
-    if (missing.length) {
-      return result('format_error', `The service account JSON is missing: ${missing.join(', ')}.`);
-    }
-    if (parsed.type !== 'service_account') {
-      return result('format_error', `Expected a service account key, got type "${parsed.type}".`);
-    }
-    // Signing a JWT assertion to exchange the key for a token is part of the
-    // GCP scanner work; until then this stays an honest structural check.
-    return result('unsupported', `Service account JSON for project "${parsed.project_id}" is well formed. Live verification arrives with the GCP scanner.`);
+async function testGcp({ keyId: projectId, secretKey: credential }) {
+  let accessToken;
+  try {
+    accessToken = await resolveGcpAccessToken(credential.trim());
+  } catch (error) {
+    return result('invalid_credentials', error.message || 'Failed to authenticate with GCP.');
   }
 
   let response;
   try {
-    response = await fetchWithTimeout(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(trimmed)}`);
+    response = await fetchWithTimeout(`https://compute.googleapis.com/compute/v1/projects/${encodeURIComponent(projectId.trim())}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
   } catch (error) {
     return networkFailure('Google Cloud', error);
   }
 
-  if (response.status === 400 || response.status === 401) {
-    return result('invalid_credentials', 'Google rejected the access token. It may be expired or malformed.');
+  if (response.ok) {
+    return result('valid', `Credential accepted. Project "${projectId.trim()}" is readable.`);
   }
-  if (!response.ok) {
-    return result('provider_error', `Google token info returned status ${response.status}.`);
+  if (response.status === 401) {
+    return result('invalid_credentials', 'GCP rejected the access token (401). It may be expired or malformed.');
   }
-
-  const info = await response.json().catch(() => ({}));
-  const scopes = String(info.scope || '').split(' ').filter(Boolean);
-  if (!scopes.some((scope) => GCP_READ_SCOPES.includes(scope))) {
-    return result('insufficient_permissions', 'The token is valid but carries no Compute or cloud-platform read scope.');
+  if (response.status === 403) {
+    return result('insufficient_permissions', 'The credential is valid but lacks Compute read access to this project (403). Grant roles/compute.viewer or broader.');
   }
-  const expiresIn = Number(info.expires_in);
-  const expiry = Number.isFinite(expiresIn) ? ` Expires in ${Math.max(0, Math.round(expiresIn / 60))} min.` : '';
-  return result('valid', `Access token accepted with Compute read scope.${expiry}`);
+  if (response.status === 404) {
+    return result('invalid_credentials', `Project "${projectId.trim()}" was not found (404). Check the project ID.`);
+  }
+  if (response.status === 429) {
+    return result('rate_limited', 'GCP is rate limiting this credential (429). Try again shortly.');
+  }
+  return result('provider_error', `GCP Compute API returned status ${response.status}.`);
 }
 
 // --- Azure ----------------------------------------------------------------
+// keyId = subscription ID, secretKey = JSON-encoded { tenantId, clientId,
+// clientSecret } (matches the field layout used by azureScanner.js and the
+// keychain storage decision to pack all three into the existing secret slot).
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const JWT_PATTERN = /^ey[\w-]+\.[\w-]+\.[\w-]*$/;
 
-async function testAzure({ keyId: subscriptionId, secretKey: token }) {
+async function testAzure({ keyId: subscriptionId, secretKey }) {
   if (!GUID_PATTERN.test(subscriptionId.trim())) {
     return result('format_error', 'The subscription ID is not a GUID (00000000-0000-0000-0000-000000000000).');
   }
-  if (!JWT_PATTERN.test(token.trim())) {
-    // A client secret cannot be exchanged for a token without a tenant and
-    // client ID, which the connection form does not capture yet.
-    return result('unsupported', 'The subscription ID is well formed. A client secret cannot be verified until tenant and client ID are captured; paste a bearer token to test now.');
+
+  let credentials;
+  try {
+    credentials = JSON.parse(secretKey);
+  } catch {
+    return result('format_error', 'Tenant ID, client ID, and client secret were not saved correctly. Re-enter them and save again.');
+  }
+  const { tenantId, clientId, clientSecret } = credentials;
+  if (!tenantId || !clientId || !clientSecret) {
+    return result('format_error', 'Tenant ID, client ID, and client secret are all required.');
+  }
+
+  let accessToken;
+  try {
+    accessToken = await getAzureAccessToken(tenantId, clientId, clientSecret);
+  } catch (error) {
+    return result('invalid_credentials', error.message || 'Failed to authenticate with Azure AD.');
   }
 
   let response;
   try {
     response = await fetchWithTimeout(
       `https://management.azure.com/subscriptions/${subscriptionId.trim()}?api-version=2022-12-01`,
-      { headers: { Authorization: `Bearer ${token.trim()}` } },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
   } catch (error) {
     return networkFailure('Azure Resource Manager', error);
   }
 
   if (response.ok) {
-    return result('valid', 'Bearer token accepted. The subscription is readable.');
-  }
-  if (response.status === 401) {
-    return result('invalid_credentials', 'Azure rejected the bearer token (401). It may have expired.');
+    return result('valid', 'App registration accepted. The subscription is readable.');
   }
   if (response.status === 403) {
-    return result('insufficient_permissions', 'The token is valid but lacks Reader access to this subscription (403).');
+    return result('insufficient_permissions', 'Authentication succeeded but the app registration lacks Reader access to this subscription (403).');
   }
   if (response.status === 404) {
-    // ARM resolves the subscription before it checks the token, so a 404 is
-    // returned even without an Authorization header. It says nothing about
-    // the token itself.
-    return result('insufficient_permissions', 'The subscription is not visible to this identity (404). Either the subscription ID is wrong or the token belongs to a different tenant.');
+    // ARM resolves the subscription before it checks the token, so a 404
+    // says nothing about the token itself.
+    return result('insufficient_permissions', 'The subscription is not visible to this app registration (404). Check the subscription ID and that it is in the same tenant.');
   }
   if (response.status === 429) {
     return result('rate_limited', 'Azure is throttling this request (429). Try again shortly.');
@@ -307,7 +304,7 @@ async function testAzure({ keyId: subscriptionId, secretKey: token }) {
 
 const PROBES = {
   aws: { name: 'AWS', required: ['keyId', 'secretKey'], run: testAws },
-  gcp: { name: 'Google Cloud', required: ['keyId'], run: testGcp },
+  gcp: { name: 'Google Cloud', required: ['keyId', 'secretKey'], run: testGcp },
   azure: { name: 'Azure', required: ['keyId', 'secretKey'], run: testAzure },
   vercel: { name: 'Vercel', required: ['keyId'], run: testVercel },
   supabase: { name: 'Supabase', required: ['keyId'], run: testSupabase },

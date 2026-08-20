@@ -1,10 +1,14 @@
 const OPENAI_COSTS_URL = 'https://api.openai.com/v1/organization/costs';
 
+export const DEFAULT_OPENAI_SETTINGS = {
+  days: 7,
+  spikeMultiplier: 2,
+};
+
 export async function scanOpenAiWaste(adminKey, options = {}) {
   if (!adminKey) return [];
 
-  const days = options.days || 7;
-  const spikeMultiplier = options.spikeMultiplier || 2;
+  const { days, spikeMultiplier } = { ...DEFAULT_OPENAI_SETTINGS, ...options };
   const endTime = Math.floor(Date.now() / 1000);
   const startTime = endTime - days * 24 * 60 * 60;
   const url = new URL(OPENAI_COSTS_URL);
@@ -43,7 +47,7 @@ export async function scanOpenAiWaste(adminKey, options = {}) {
     resource: 'API Cost Spike',
     details: `$${latest.amount.toFixed(2)} today vs $${baseline.toFixed(2)} daily baseline`,
     monthlyLoss: Number((excessDailySpend * 30).toFixed(2)),
-    severity: 'High',
     remediable: false,
+    estimateBasis: `Estimate: (today's spend $${latest.amount.toFixed(2)} - ${days}-day baseline $${baseline.toFixed(2)}) x 30, flagged when today's spend is at least ${spikeMultiplier}x the baseline (configurable window and multiplier).`,
   }];
 }
