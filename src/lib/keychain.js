@@ -18,3 +18,16 @@ export async function retrieveLocalKeys(provider) {
     return null;
   }
 }
+
+export async function deleteLocalKeys(provider) {
+  try {
+    await invoke('delete_credentials', { provider });
+    return { success: true };
+  } catch (err) {
+    console.error(`Failed to remove ${provider} keys:`, err);
+    return {
+      success: false,
+      message: 'Could not access the native keychain. Run the desktop app and try again.',
+    };
+  }
+}

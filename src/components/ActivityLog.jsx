@@ -44,7 +44,7 @@ export default function ActivityLog({ events, onClear }) {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search activity" className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-500 outline-none" />
           </div>
           <div className="flex items-center gap-2">
-            {['all', 'scan', 'remediation'].map((type) => (
+            {['all', 'scan', 'remediation', 'credential'].map((type) => (
               <button key={type} onClick={() => setFilter(type)} className={`rounded-lg px-3 py-2 text-xs font-medium capitalize transition ${filter === type ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{type}</button>
             ))}
             {events.length > 0 && <button onClick={onClear} className="ml-2 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Clear activity history"><Trash2 size={15} /></button>}

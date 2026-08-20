@@ -67,6 +67,20 @@ export default function App() {
     restoreCredentials();
   }, []);
 
+  // Clearing in-memory credentials is what stops the next scan from reaching a
+  // provider, so it runs alongside deleting the keychain entries.
+  const clearProviderCredentials = (provider) => {
+    const clearers = {
+      aws: () => { setAwsKeyId(''); setAwsSecretKey(''); },
+      vercel: () => setVercelToken(''),
+      supabase: () => setSupabaseToken(''),
+      gcp: () => setGcpToken(''),
+      azure: () => { setAzureSubscriptionId(''); setAzureToken(''); },
+      openai: () => setOpenAiKey(''),
+    };
+    clearers[provider]?.();
+  };
+
   const [wasteItems, setWasteItems] = useState([]);
 
   const totalMonthlyLoss = wasteItems.reduce((acc, i) => acc + i.monthlyLoss, 0);
@@ -185,6 +199,8 @@ export default function App() {
             azureSubscriptionId={azureSubscriptionId} setAzureSubscriptionId={setAzureSubscriptionId}
             azureToken={azureToken} setAzureToken={setAzureToken}
             openAiKey={openAiKey} setOpenAiKey={setOpenAiKey}
+            onClearProvider={clearProviderCredentials}
+            onLogActivity={addActivity}
           />
         ) : activeTab === 'activity' ? (
           <ActivityLog events={activityEvents} onClear={() => setActivityEvents([])} />
