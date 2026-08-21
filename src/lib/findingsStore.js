@@ -18,23 +18,32 @@
 // "Active" (open + reopened) is what the dashboard and default table view
 // show; the rest stays in history rather than being silently dropped.
 
+import { loadVersioned, saveVersioned } from './versionedStorage';
+
 const STORAGE_KEY = 'watermonkey-report';
 const MAX_RECORDS = 500;
+
+// Schema versioning (SPEC §9). Version 0 is the original unwrapped
+// `{records, lastScanAt}` shape written before this schema existed — it's
+// already structurally compatible with v1, so its migration is the
+// identity function; the version wrapper itself is handled by
+// `loadVersioned`. Add a `1: (data) => ({...})` entry here the next time
+// the record shape changes.
+const SCHEMA_VERSION = 1;
+const MIGRATIONS = {
+  0: (data) => data,
+};
 
 function recordKey(record) {
   return `${record.provider}::${record.id}`;
 }
 
 export function loadReport() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return {
-      records: Array.isArray(stored.records) ? stored.records : [],
-      lastScanAt: stored.lastScanAt || null,
-    };
-  } catch {
-    return { records: [], lastScanAt: null };
-  }
+  const data = loadVersioned(STORAGE_KEY, SCHEMA_VERSION, MIGRATIONS, { records: [], lastScanAt: null });
+  return {
+    records: Array.isArray(data.records) ? data.records : [],
+    lastScanAt: data.lastScanAt || null,
+  };
 }
 
 export function saveReport(report) {
@@ -47,7 +56,7 @@ export function saveReport(report) {
     .sort((a, b) => new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime());
   const keepInactive = inactive.slice(0, Math.max(0, MAX_RECORDS - active.length));
   const bounded = { ...report, records: [...active, ...keepInactive] };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bounded));
+  saveVersioned(STORAGE_KEY, SCHEMA_VERSION, bounded);
   return bounded;
 }
 

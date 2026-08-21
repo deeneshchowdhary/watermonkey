@@ -216,11 +216,11 @@ fn main() {
 }
 
 // SPEC §6.14: provider HTTP calls mocked via `mockito`, base URL injected
-// through the `_at` helpers above. `save_credentials`/`get_credentials`/
-// `forget_entry` are not covered here — they talk to the real OS keychain
-// (macOS Keychain / Windows Credential Manager / Secret Service), which
-// isn't available in a typical CI container, and faking it would mean
-// mocking the `keyring` crate itself rather than testing real behavior.
+// through the `_at` helpers above. Keychain-touching tests are marked
+// `#[ignore]` (see the bottom of this module) since they need a real OS
+// keychain (macOS Keychain / Windows Credential Manager / Secret Service)
+// that a typical CI container doesn't have; run them explicitly with
+// `cargo test -- --ignored` on a machine that has one.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,5 +338,45 @@ mod tests {
 
         let error = delete_vercel_project_at(&server.url(), "token".to_string(), "proj-1".to_string()).await.unwrap_err();
         assert!(error.contains("404"));
+    }
+
+    // --- Real-keychain tests -------------------------------------------
+    // Ignored by default since they need a real OS keychain; run explicitly
+    // with `cargo test -- --ignored` on a machine that has one. Provider
+    // names are distinctive test-only strings, never a real provider id, to
+    // avoid touching anything a real run of the app might have saved.
+
+    #[test]
+    #[ignore = "touches the real OS keychain; not available in a typical CI container"]
+    fn save_get_delete_credentials_round_trip() {
+        let provider = "test_ci_probe_keychain_roundtrip".to_string();
+
+        save_credentials(provider.clone(), "test-key-id".to_string(), "test-secret".to_string())
+            .expect("save_credentials should succeed against a real keychain");
+
+        let (key_id, secret_key) = get_credentials(provider.clone())
+            .expect("get_credentials should read back what was just saved");
+        assert_eq!(key_id, "test-key-id");
+        assert_eq!(secret_key, "test-secret");
+
+        delete_credentials(provider.clone()).expect("delete_credentials should succeed");
+
+        let after_delete = get_credentials(provider);
+        assert!(after_delete.is_err(), "credentials should be gone after delete_credentials");
+    }
+
+    #[test]
+    #[ignore = "touches the real OS keychain; not available in a typical CI container"]
+    fn forget_entry_treats_a_missing_entry_as_already_removed() {
+        let result = forget_entry("watermonkey_test_ci_probe_that_never_existed", "access_key_id");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[ignore = "touches the real OS keychain; not available in a typical CI container"]
+    fn delete_credentials_is_idempotent_when_nothing_was_saved() {
+        let provider = "test_ci_probe_never_saved".to_string();
+        let result = delete_credentials(provider);
+        assert!(result.is_ok(), "deleting credentials that were never saved should not error");
     }
 }

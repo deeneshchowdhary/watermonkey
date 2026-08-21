@@ -31,7 +31,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.amazonaws.com https://api.vercel.com https://api.openai.com https://oauth2.googleapis.com https://compute.googleapis.com https://login.microsoftonline.com https://management.azure.com http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     },
     "bundle": {
       "active": true,

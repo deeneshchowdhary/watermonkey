@@ -103,6 +103,18 @@ describe('loadReport / saveReport', () => {
     expect(loadReport()).toEqual({ records: [], lastScanAt: null });
   });
 
+  it('reads pre-versioning data written by an older build without losing anything', () => {
+    // The shape used before schema versioning (§9) was introduced: a bare
+    // {records, lastScanAt} object with no version wrapper at all.
+    localStorage.setItem('watermonkey-report', JSON.stringify({
+      records: [{ provider: 'AWS', id: 'vol-1', status: 'open', monthlyLoss: 5, lastSeenAt: 't1' }],
+      lastScanAt: 't1',
+    }));
+    const loaded = loadReport();
+    expect(loaded.records).toHaveLength(1);
+    expect(loaded.records[0].id).toBe('vol-1');
+  });
+
   it('bounds resolved/missing history but never trims active records', () => {
     const active = Array.from({ length: 10 }, (_, i) => ({ provider: 'AWS', id: `open-${i}`, status: 'open', lastSeenAt: 't1' }));
     const inactive = Array.from({ length: 600 }, (_, i) => ({ provider: 'AWS', id: `old-${i}`, status: 'resolved', lastSeenAt: `t${i}` }));

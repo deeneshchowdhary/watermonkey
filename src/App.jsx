@@ -17,6 +17,7 @@ import { deleteResource } from './lib/deleter';
 import { retrieveLocalKeys } from './lib/keychain';
 import { loadScanSettings, saveScanSettings } from './lib/scanSettings';
 import { loadReport, saveReport, reconcile, activeRecords, markAcknowledged, markResolved } from './lib/findingsStore';
+import { loadActivity, saveActivity } from './lib/activityStore';
 import { computeSeverity } from './lib/severity';
 import { useTheme } from './lib/theme';
 import { RefreshCw, TrendingDown, ShieldCheck, Cloud } from 'lucide-react';
@@ -51,18 +52,12 @@ export default function App() {
   const [scanMessage, setScanMessage] = useState('');
   const [providerStatus, setProviderStatus] = useState(idleProviderStatus);
   const [report, setReport] = useState(loadReport);
-  const [activityEvents, setActivityEvents] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('watermonkey-activity') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  const [activityEvents, setActivityEvents] = useState(loadActivity);
 
   const isScanning = Object.values(providerStatus).some((p) => p.state === 'scanning');
 
   useEffect(() => {
-    localStorage.setItem('watermonkey-activity', JSON.stringify(activityEvents.slice(0, 250)));
+    saveActivity(activityEvents);
   }, [activityEvents]);
 
   useEffect(() => {
