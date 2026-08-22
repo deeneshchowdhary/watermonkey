@@ -35,5 +35,3 @@ coverage/
 
 # Tauri signing artifacts
 *.sig
-SPEC.md
-MONETIZE.md

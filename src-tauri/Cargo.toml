@@ -3,6 +3,7 @@ name = "watermonkey"
 version = "0.1.0"
 description = "Water Monkey Desktop App"
 edition = "2021"
+license = "AGPL-3.0-only"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }

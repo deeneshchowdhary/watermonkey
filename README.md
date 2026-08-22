@@ -58,3 +58,7 @@ Credentials are stored through the native OS keychain and are not written to rep
 ## Status
 
 Water Monkey is under active development. Review every remediation target carefully before confirming a destructive provider action.
+
+## License
+
+Water Monkey is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPLv3) — free to use, modify, and self-host, including commercially, under AGPLv3's terms. A commercial license is available for organizations that need different terms; see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).
