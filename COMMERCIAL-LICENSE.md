@@ -45,13 +45,27 @@ for a solo-authored codebase.)
   agreement would need its own explicit warranty/support terms if any are
   offered.
 
+## Pricing — decided 2026-08-23
+
+**No separate price.** Paying for the Pro subscription (see `MONETIZE.md`)
+*is* how a company gets the commercial license — one purchase grants both
+Pro-tier features and freedom from AGPLv3's copyleft obligation. Given the
+realistic buyer here is a single senior/lead engineer or a 1–2 person
+cloud team, not a large org, a second SKU for "legal cover only, no
+features" would serve a customer that essentially doesn't exist for this
+product; Pro already covers them.
+
+**The one case this doesn't cover:** a company that wants to **embed,
+fork, or resell** the core commercially — meaningfully different from
+"use it internally," since it's granting IP/redistribution rights, not
+tool access. That case is intentionally **not self-serve and not
+publicly priced** — handle it as a negotiated "contact us" deal, the same
+way `MONETIZE.md`'s Enterprise tier already is.
+
 ## What this is not
 
 - Not a support contract. Support terms (response time, channels, SLAs)
   would need to be a separate, explicit agreement if offered.
-- Not a statement of price. See `MONETIZE.md` for draft pricing — nothing
-  there is final, and none of it belongs in a real license agreement
-  until it's actually decided and reviewed.
 - Not applicable to the AGPLv3-licensed core itself. Anyone can already
   use that under AGPLv3's own terms, for free, without needing this.
 
