@@ -3,6 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "license": "AGPL-3.0-only",
+  "author": "Deenesh Chowdhary",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deeneshchowdhary/watermonkey.git"
+  },
+  "bugs": {
+    "url": "https://github.com/deeneshchowdhary/watermonkey/issues"
+  },
+  "homepage": "https://github.com/deeneshchowdhary/watermonkey#readme",
   "type": "module",
   "scripts": {
     "dev": "vite",

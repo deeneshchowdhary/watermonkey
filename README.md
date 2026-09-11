@@ -2,7 +2,7 @@
 
 Water Monkey is a local-first desktop application for finding avoidable cloud costs. It combines a React dashboard with a Rust/Tauri backend, native keychain storage, and optional local AI summaries through Ollama.
 
-See [SPEC.md](SPEC.md) for the complete current-feature specification, development backlog, acceptance criteria, and release requirements. See [docs/permissions-and-recovery.md](docs/permissions-and-recovery.md) for the permissions each provider needs, pricing assumptions behind every estimate, and how to recover from a failed remediation. See [RELEASING.md](RELEASING.md) for the signed-build/auto-update setup runbook.
+See [SPEC.md](SPEC.md) for the current feature specification, product principles, and the technical decisions behind them. See [docs/permissions-and-recovery.md](docs/permissions-and-recovery.md) for the permissions each provider needs, pricing assumptions behind every estimate, and how to recover from a failed remediation. See [RELEASING.md](RELEASING.md) for the signed-build/auto-update setup runbook.
 
 ## Current capabilities
 

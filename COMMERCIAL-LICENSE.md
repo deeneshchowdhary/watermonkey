@@ -37,9 +37,8 @@ for a solo-authored codebase.)
   own product or internal tool) without being required to publish their
   modifications.
 - **Access to Pro-tier features** — functionality that lives outside the
-  public AGPLv3 repository (see `MONETIZE.md` for what that currently
-  means: scheduled scans, report export, multi-account profiles, and
-  later tiers).
+  public AGPLv3 repository (currently: scheduled scans, report export,
+  multi-account profiles, and later tiers).
 - **No warranty beyond what's explicitly negotiated.** The default
   assumption, matching AGPLv3 itself, is "as-is" — a real commercial
   agreement would need its own explicit warranty/support terms if any are
@@ -47,7 +46,7 @@ for a solo-authored codebase.)
 
 ## Pricing — decided 2026-08-23
 
-**No separate price.** Paying for the Pro subscription (see `MONETIZE.md`)
+**No separate price.** Paying for the Pro subscription
 *is* how a company gets the commercial license — one purchase grants both
 Pro-tier features and freedom from AGPLv3's copyleft obligation. Given the
 realistic buyer here is a single senior/lead engineer or a 1–2 person
@@ -60,7 +59,7 @@ fork, or resell** the core commercially — meaningfully different from
 "use it internally," since it's granting IP/redistribution rights, not
 tool access. That case is intentionally **not self-serve and not
 publicly priced** — handle it as a negotiated "contact us" deal, the same
-way `MONETIZE.md`'s Enterprise tier already is.
+way the Enterprise tier already is.
 
 ## What this is not
 

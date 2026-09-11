@@ -75,9 +75,9 @@ exist, not as something to fake in the meantime.
 ## Distribution channel
 
 Direct download + this auto-updater, or an app store (Mac App Store /
-Microsoft Store) — still an open decision (see MONETIZE.md). The Mac App
-Store's sandboxing requirements are a real risk given this app's native
-keychain access and `shell.open` usage; most comparable Tauri/Electron dev
-tools use direct download for exactly this reason. Decide before the first
-signed release, since it affects which of the steps above are even relevant
-(app stores handle their own signing and don't use this updater mechanism).
+Microsoft Store) — still an open decision. The Mac App Store's sandboxing
+requirements are a real risk given this app's native keychain access and
+`shell.open` usage; most comparable Tauri/Electron dev tools use direct
+download for exactly this reason. Decide before the first signed release,
+since it affects which of the steps above are even relevant (app stores
+handle their own signing and don't use this updater mechanism).
