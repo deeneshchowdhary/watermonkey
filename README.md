@@ -4,6 +4,27 @@ Water Monkey is a local-first desktop application for finding avoidable cloud co
 
 See [SPEC.md](SPEC.md) for the current feature specification, product principles, and the technical decisions behind them. See [docs/permissions-and-recovery.md](docs/permissions-and-recovery.md) for the permissions each provider needs, pricing assumptions behind every estimate, and how to recover from a failed remediation. See [RELEASING.md](RELEASING.md) for the signed-build/auto-update setup runbook.
 
+## Why it's useful
+
+Cloud bills quietly grow from things nobody is using: an EBS volume left behind after an instance was terminated, an Elastic IP that is no longer attached, a forgotten Vercel or Supabase project, a runaway OpenAI job. Each one is small, but they accumulate, and finding them normally means clicking through several provider consoles.
+
+Water Monkey checks all of your providers in one place, estimates what each leftover resource costs per month, ranks findings by severity, and lets you act on them (or mark them reviewed) with a history of what changed.
+
+- **Local-first and private.** There is no Water Monkey server or account. Credentials live in your OS keychain, scans run from your own machine straight to each provider, and nothing is sent anywhere else.
+- **Safe by default.** Scanning needs read-only permissions. Deleting anything is optional, needs an extra permission you grant yourself, and always asks for confirmation.
+- **Honest numbers.** Every estimate shows how it was calculated. They are directional estimates for prioritizing review, not invoices.
+- **Nothing gets lost.** Findings persist across scans, so you can see what is new, what came back, and what disappeared.
+- **Optional AI summary.** Get a short plain-English summary from a local Ollama model, without sending data to a hosted AI service.
+
+## Who can use it
+
+- **Solo developers and indie hackers** running side projects across AWS, Vercel, Supabase, and OpenAI who want to stop paying for forgotten resources.
+- **Startup engineers and founders** without a dedicated FinOps tool who want a quick, no-signup cost cleanup pass.
+- **DevOps and platform engineers** who want a read-only audit they can run against an account before a cleanup or a cost review.
+- **Small cloud teams and consultants** who need a fast, credential-local way to review a client's or team's accounts without handing keys to a third-party SaaS.
+
+It is a desktop app for macOS, Windows, and Linux. You will need credentials for the providers you want to scan; see [docs/permissions-and-recovery.md](docs/permissions-and-recovery.md) for the minimum permissions each one needs.
+
 ## Current capabilities
 
 - Scan AWS (selectable regions), GCP (selectable zones), and Azure for unattached disks and unused/reserved IPs.
