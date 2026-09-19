@@ -41,7 +41,7 @@ It is a desktop app for macOS, Windows, and Linux. You will need credentials for
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 22.22 or newer (24 recommended)
 - Rust toolchain
 - Platform dependencies required by Tauri 1
 - Ollama with `llama3.2:1b` (optional)
